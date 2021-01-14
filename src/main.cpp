@@ -94,14 +94,6 @@ void loop()
       Serial.println(buf[3]);
       Serial.println(buf[4]);
       Serial.println(buf[5]);
-
-      // Serial.println((char*)buf);
-      
-      // Send a reply
-      uint8_t data[] = "And hello back to you";
-      nrf24.send(data, sizeof(data));
-      nrf24.waitPacketSent();
-      Serial.println("Sent a reply");
     }
     else
     {

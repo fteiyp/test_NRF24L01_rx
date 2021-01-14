@@ -57,6 +57,9 @@
 #include <SPI.h>
 #include <RH_NRF24.h>
 
+// data transfer array
+uint8_t flexValues[6];
+
 // Singleton instance of the radio driver
 RH_NRF24 nrf24;
 
@@ -84,8 +87,15 @@ void loop()
     if (nrf24.recv(buf, &len))
     {
       // NRF24::printBuffer("request: ", buf, len);
-      Serial.print("got request: ");
-      Serial.println((char*)buf);
+      Serial.println("got request: ");
+      Serial.println(buf[0]);
+      Serial.println(buf[1]);
+      Serial.println(buf[2]);
+      Serial.println(buf[3]);
+      Serial.println(buf[4]);
+      Serial.println(buf[5]);
+
+      // Serial.println((char*)buf);
       
       // Send a reply
       uint8_t data[] = "And hello back to you";

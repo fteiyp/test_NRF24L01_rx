@@ -66,4 +66,5 @@ void loop()
       Serial.println("recv failed");
     }
   }
+  delay(10);
 }

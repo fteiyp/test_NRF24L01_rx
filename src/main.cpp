@@ -1,23 +1,53 @@
 
 // SERVER
-#include <SPI.h>
-#include <RH_NRF24.h>
+#include <RF24.h>
 #include <Servo.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 Servo servoLeftArm;
 Servo servoRightArm;
 Servo servoLeftLeg;
 Servo servoRightLeg;
 
-// data transfer array
-uint8_t flexValues[6];
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// Singleton instance of the radio driver
-RH_NRF24 nrf24;
+// instantiate an object for the nRF24L01 transceiver
+RF24 radio(7, 8); // using pin 7 for the CE pin, and pin 8 for the CSN pin
 
-void setup() 
+// For this example, we'll be using 6 addresses; 1 for each TX node
+// It is very helpful to think of an address as a path instead of as
+// an identifying device destination
+// Notice that the last byte is the only byte that changes in the last 5
+// addresses. This is a limitation of the nRF24L01 transceiver for pipes 2-5
+// because they use the same first 4 bytes from pipe 1.
+uint64_t address[6] = 
 {
-  Serial.begin(9600);
+  0x7878787878LL,
+  0xB3B4B5B6F1LL,
+};
+
+struct PayloadStruct
+{
+  uint8_t nodeID;
+  uint8_t val1;
+  uint8_t val2;
+  uint8_t val3;
+  uint8_t val4;
+  uint8_t val5;
+};
+PayloadStruct payload;
+
+/*************************************** SETUP *****************************************/
+void setup()
+{
+  Serial.begin(115200);
 
   // Attach servos
   servoLeftArm.attach(2);
@@ -25,46 +55,75 @@ void setup()
   servoLeftLeg.attach(4);
   servoRightLeg.attach(5);
 
-  while (!Serial) 
-    ; // wait for serial port to connect. Needed for Leonardo only
-  if (!nrf24.init())
-    Serial.println("init failed");
-  // Defaults after init are 2.402 GHz (channel 2), 2Mbps, 0dBm
-  if (!nrf24.setChannel(1))
-    Serial.println("setChannel failed");
-  if (!nrf24.setRF(RH_NRF24::DataRate2Mbps, RH_NRF24::TransmitPower0dBm))
-    Serial.println("setRF failed");    
-}
+  // initialize the transceiver on the SPI bus
+  if (!radio.begin()) {
+    Serial.println(F("radio hardware is not responding!!"));
+    while(1) {}
+  }
 
-void loop()
+  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println("SSD1306 allocation failed");
+    while(1) {}
+  }
+
+  // Set the PA Level low to try preventing power supply related problems
+  // because these examples are likely run with nodes in close proximity of
+  // each other.
+  radio.setPALevel(RF24_PA_LOW); // RF24_PA_MAX is default.
+  // save on transmission time by setting the radio to only transmit the
+  // number of bytes we need to transmit a float
+  radio.setPayloadSize(sizeof(payload)); // 2x int datatype occupy 8 bytes
+  // Set the addresses for all pipes to TX nodes
+  radio.openReadingPipe(0, address[0]);
+  radio.openReadingPipe(1, address[1]);
+  // put radio in RX mode
+  radio.startListening(); 
+
+  // setup OLED display
+  display.clearDisplay();
+  display.setTextSize(1);               
+  display.setTextColor(SSD1306_WHITE); 
+
+} // setup
+
+/*************************************** LOOP *****************************************/
+
+void loop() // loop (reciever)
 {
-  if (nrf24.available())
-  {
-    // Should be a message for us now   
-    uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
-    uint8_t len = sizeof(buf);
-    if (nrf24.recv(buf, &len))
-    {
-      // NRF24::printBuffer("request: ", buf, len);
-      // Serial.println("got request: ");
-      Serial.println(buf[0]);
-      Serial.println(buf[1]);
-      Serial.println(buf[2]);
-      Serial.println(buf[3]);
-      Serial.println(buf[4]);
-      Serial.println(buf[5]);
+  uint8_t pipe;
+  if (radio.available(&pipe)) {             // is there a payload? get the pipe number that recieved it
+    uint8_t length = radio.getPayloadSize(); // get the size of the payload
+    radio.read(&payload, length);            // fetch payload from FIFO
+    Serial.print(F("Received "));
+    Serial.print(length);                    // print the size of the payload
+    Serial.print(F(" length on pipe "));
+    Serial.print(pipe);                     // print the pipe number
+    Serial.print(F(" from node "));
+    Serial.print(payload.nodeID);           // print the payload's origin
+    Serial.print(F(". Val1: "));
+    Serial.println(payload.val1);      // print the payload's number
 
-      // Write data values to servos
-      servoLeftArm.write(buf[0]);
-      servoRightArm.write(buf[1]);
-      servoLeftLeg.write(buf[2]);
-      servoRightLeg.write(buf[3]);
+    // display values received
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.print("Rx'd ");
+    display.print(length);
+    display.print(" bytes from node");
+    display.print(payload.nodeID);
+    display.display();
 
-    }
-    else
-    {
-      Serial.println("recv failed");
+    if (payload.nodeID == 0) {
+      // left hand control
+      servoLeftArm.write(payload.val2);
+      servoLeftLeg.write(payload.val3);
+    } else if (payload.nodeID == 1) {
+      // right hand control
+      servoRightArm.write(payload.val2);
+      servoRightLeg.write(payload.val3);
+    } else {
+      Serial.print("Error: wrong ID");
     }
   }
-  delay(10);
-}
+  delay(100);
+} // loop

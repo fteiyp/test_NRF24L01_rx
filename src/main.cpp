@@ -12,6 +12,8 @@ Servo servoRightArm;
 Servo servoLeftLeg;
 Servo servoRightLeg;
 
+#define DELAY 30
+
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
@@ -51,8 +53,8 @@ void setup()
 
   // Attach servos
   servoLeftArm.attach(2);
-  servoRightArm.attach(3);
-  servoLeftLeg.attach(4);
+  servoLeftLeg.attach(3);
+  servoRightArm.attach(4);
   servoRightLeg.attach(5);
 
   // initialize the transceiver on the SPI bus
@@ -110,7 +112,9 @@ void loop() // loop (reciever)
     display.print("Rx'd ");
     display.print(length);
     display.print(" bytes from node");
-    display.print(payload.nodeID);
+    display.println(payload.nodeID);
+    display.println(payload.val2);
+    display.println(payload.val3);
     display.display();
 
     if (payload.nodeID == 0) {
@@ -125,5 +129,5 @@ void loop() // loop (reciever)
       Serial.print("Error: wrong ID");
     }
   }
-  delay(100);
+  delay(DELAY);
 } // loop

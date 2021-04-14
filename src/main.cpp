@@ -2,9 +2,6 @@
 // SERVER
 #include <RF24.h>
 #include <Servo.h>
-#include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
 Servo servoLeftArm;
@@ -12,7 +9,7 @@ Servo servoRightArm;
 Servo servoLeftLeg;
 Servo servoRightLeg;
 
-#define DELAY 30
+#define DELAY 10
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
